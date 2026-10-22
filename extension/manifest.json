@@ -1,0 +1,45 @@
+{
+  "manifest_version": 3,
+  "name": "ISS – International Space Station",
+  "short_name": "ISS",
+  "version": "0.1.0",
+  "description": "Free, open-source audio toolkit for X Spaces: clean music audio, mixer, soundboard, local player, custom reactions.",
+  "homepage_url": "https://github.com/skullzarmy/international-space-station",
+  "minimum_chrome_version": "111",
+  "icons": { "16": "icons/icon16.png", "32": "icons/icon32.png", "48": "icons/icon48.png", "128": "icons/icon128.png" },
+  "action": {
+    "default_title": "ISS – International Space Station",
+    "default_popup": "popup/popup.html",
+    "default_icon": { "16": "icons/icon16.png", "32": "icons/icon32.png" }
+  },
+  "background": { "service_worker": "src/ext/background.js" },
+  "permissions": ["tabs"],
+  "content_scripts": [
+    {
+      "matches": ["https://x.com/*", "https://twitter.com/*"],
+      "js": [
+        "src/page/core.js",
+        "src/page/sdp.js",
+        "src/page/constraints.js",
+        "src/page/chat.js",
+        "src/page/titles.js",
+        "src/page/engine.js",
+        "src/page/hooks.js",
+        "src/page/store.js",
+        "src/page/board.js",
+        "src/page/station.js",
+        "src/page/nowplaying.js",
+        "src/page/ui.js",
+        "src/page/main.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "all_frames": false
+    },
+    {
+      "matches": ["https://x.com/*", "https://twitter.com/*"],
+      "js": ["src/ext/bridge.js"],
+      "run_at": "document_start"
+    }
+  ]
+}

@@ -1,0 +1,86 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Fake X Space</title></head>
+<body style="background:#000;color:#fff;font-family:sans-serif">
+<h1>Fake X Space (test fixture)</h1>
+<p>This page does what X's web client does when you speak in a Space.</p>
+<script>
+// Mirrors X's behaviour closely enough to exercise every ISS hook.
+window.fakeX = {
+  async speak() {
+    // 1. X asks for a voice-processed mic.
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+    });
+    const track = stream.getAudioTracks()[0];
+
+    // 2. Publish over WebRTC (loopback stands in for X's Janus server).
+    const pc1 = new RTCPeerConnection();
+    const pc2 = new RTCPeerConnection();
+    pc1.onicecandidate = (e) => e.candidate && pc2.addIceCandidate(e.candidate);
+    pc2.onicecandidate = (e) => e.candidate && pc1.addIceCandidate(e.candidate);
+    const received = new Promise((r) => (pc2.ontrack = (e) => r(e.track)));
+    pc1.addTrack(track, stream);
+    const offer = await pc1.createOffer();
+    await pc1.setLocalDescription(offer);
+    await pc2.setRemoteDescription(pc1.localDescription);
+    const answer = await pc2.createAnswer();
+    await pc2.setLocalDescription(answer);
+    await pc1.setRemoteDescription(pc2.localDescription);
+    this.pc1 = pc1;
+    this.pc2 = pc2;
+    this.sentTrack = track;
+    this.remoteTrack = await received;
+    // Chrome only decodes received audio that is being played somewhere.
+    const audio = new Audio();
+    audio.srcObject = new MediaStream([this.remoteTrack]);
+    audio.volume = 0;
+    audio.play().catch(() => {});
+    this.remoteAudio = audio;
+    const actx = new AudioContext();
+    this.remoteAnalyser = actx.createAnalyser();
+    actx.createMediaStreamSource(new MediaStream([this.remoteTrack])).connect(this.remoteAnalyser);
+    actx.resume();
+    await new Promise((r) => {
+      const check = () => (pc1.connectionState === 'connected' ? r() : setTimeout(check, 50));
+      check();
+    });
+    return {
+      label: track.label,
+      remoteSdp: pc1.remoteDescription.sdp,
+      localSdp: pc1.localDescription.sdp,
+    };
+  },
+
+  // 3. Join the Space's chat room on the Periscope chat socket.
+  joinChat(room) {
+    return new Promise((resolve) => {
+      const ws = new WebSocket('wss://prod-chatman-ancillary-us-east-1.pscp.tv/chatapi/v1/chatnow');
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ payload: JSON.stringify({ access_token: 'tok' }), kind: 3 }));
+        ws.send(JSON.stringify({ payload: JSON.stringify({ body: JSON.stringify({ room }), kind: 1 }), kind: 2 }));
+        resolve();
+      };
+      this.ws = ws;
+    });
+  },
+
+  // 4. The host edits the Space title in X's UI.
+  editTitle(spaceId, title) {
+    return fetch('https://x.com/i/api/graphql/FAKEQ/EditAudioSpace', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-csrf-token': 'stale', authorization: 'Bearer PUBLIC' },
+      body: JSON.stringify({ variables: { audio_space_id: spaceId, title }, queryId: 'FAKEQ' }),
+    });
+  },
+
+  // Peak level of the audio decoded on the receiving end (0..1).
+  receivedLevel() {
+    const buf = new Float32Array(this.remoteAnalyser.fftSize);
+    this.remoteAnalyser.getFloatTimeDomainData(buf);
+    return buf.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
+  },
+};
+</script>
+</body>
+</html>

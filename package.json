@@ -1,0 +1,15 @@
+{
+  "name": "international-space-station",
+  "version": "0.1.0",
+  "description": "ISS: free, open-source audio toolkit for X Spaces (browser extension + userscript).",
+  "private": true,
+  "license": "Unlicense",
+  "scripts": {
+    "test": "node --test test/unit/*.test.js",
+    "test:e2e": "node test/e2e/run.mjs",
+    "build": "node scripts/build.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
